@@ -27,12 +27,6 @@ namespace GitHub.StartPage
         {
             serviceProvider = this;
         }
-
-        //protected override tasks.Task InitializeAsync(CancellationToken cancellationToken, IProgress<ServiceProgressData> progress)
-        //{
-        //    //return tasks.Task.Run(() => GetGlobalService(typeof(IUIProvider)) as IUIProvider);
-        //    return base.InitializeAsync(cancellationToken, progress);
-        //}
     }
 
     [Guid(ContainerGuid)]
@@ -46,7 +40,7 @@ namespace GitHub.StartPage
             try
             {
                 var uiProvider = await tasks.Task.Run(() => Package.GetGlobalService(typeof(IUIProvider)) as IUIProvider);
-                var te = StartPagePackage.ServiceProvider.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
+                var te = uiProvider?.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
                 var page = te?.NavigateToPage(new Guid(TeamExplorerPageIds.Connect), null);
                 var service = page?.GetService<IGitRepositoriesExt>();
                 if (service == null)
