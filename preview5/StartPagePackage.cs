@@ -2,9 +2,6 @@
 using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
-using tasks = System.Threading.Tasks;
-using ICodeContainerProvider = Microsoft.VisualStudio.Shell.CodeContainerManagement.ICodeContainerProvider;
-using CodeContainer = Microsoft.VisualStudio.Shell.CodeContainerManagement.CodeContainer;
 using Microsoft.VisualStudio.Shell;
 using GitHub.Services;
 using GitHub.UI;
@@ -13,6 +10,10 @@ using System.IO;
 using Microsoft.TeamFoundation.Controls;
 using Microsoft.TeamFoundation.Git.Controls.Extensibility;
 using Microsoft.VisualStudio.Shell.CodeContainerManagement;
+using ICodeContainerProvider = Microsoft.VisualStudio.Shell.CodeContainerManagement.ICodeContainerProvider;
+using CodeContainer = Microsoft.VisualStudio.Shell.CodeContainerManagement.CodeContainer;
+using Task = System.Threading.Tasks.Task;
+using System.ComponentModel;
 
 namespace GitHub.StartPage
 {
@@ -40,48 +41,26 @@ namespace GitHub.StartPage
 
         public async Task<CodeContainer> AcquireCodeContainerAsync(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
-            string basePath = null;
-            string repositoryName = null;
+            CloneRequest request = null;
+
             try
             {
-                var uiProvider = await tasks.Task.Run(() => Package.GetGlobalService(typeof(IUIProvider)) as IUIProvider);
-                var te = uiProvider?.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
-                var page = te?.NavigateToPage(new Guid(TeamExplorerPageIds.Connect), null);
-                var service = page?.GetService<IGitRepositoriesExt>();
-                if (service == null)
-                    return null;
-
-                uiProvider.AddService(this, service);
-
-                var load = uiProvider.SetupUI(UIControllerFlow.Clone, null);
-                load.Subscribe(x =>
-                {
-                    if (x.Data.ViewType == Exports.UIViewType.Clone)
-                    {
-                        var vm = x.View.ViewModel as IRepositoryCloneViewModel;
-                        x.View.Done.Subscribe(_ =>
-                        {
-                            basePath = vm.BaseRepositoryPath;
-                            repositoryName = vm.SelectedRepository.Name;
-                        });
-                    }
-                });
-                uiProvider.RunUI();
-
-                uiProvider.RemoveService(typeof(IGitRepositoriesExt), this);
+                var uiProvider = await Task.Run(() => Package.GetGlobalService(typeof(IUIProvider)) as IUIProvider);
+                var gitRepositories = await GetGitRepositoriesExt(uiProvider);
+                request = ShowCloneDialog(uiProvider, gitRepositories);
             }
             catch
             {
                 // TODO: log
             }
 
-            if (basePath == null)
+            if (request == null)
                 return null;
 
-            var path = Path.Combine(basePath, repositoryName);
+            var path = Path.Combine(request.BasePath, request.RepositoryName);
             return new CodeContainer(
                 localProperties: new CodeContainerLocalProperties(path, CodeContainerType.Folder,
-                                new CodeContainerSourceControlProperties(repositoryName, path, GitSccProvider)),
+                                new CodeContainerSourceControlProperties(request.RepositoryName, path, GitSccProvider)),
                 remote: null,
                 isFavorite: false,
                 lastAccessed: DateTimeOffset.UtcNow);
@@ -90,6 +69,87 @@ namespace GitHub.StartPage
         public Task<CodeContainer> AcquireCodeContainerAsync(RemoteCodeContainer onlineCodeContainer, IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
             throw new NotImplementedException();
+        }
+
+        async Task<IGitRepositoriesExt> GetGitRepositoriesExt(IUIProvider uiProvider)
+        {
+            var page = await GetTeamExplorerPage(uiProvider);
+            return page?.GetService<IGitRepositoriesExt>();
+        }
+
+        async Task<ITeamExplorerPage> GetTeamExplorerPage(IUIProvider uiProvider)
+        {
+            var te = uiProvider?.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
+
+            if (te != null)
+            {
+                var page = te.NavigateToPage(new Guid(TeamExplorerPageIds.Connect), null);
+
+                if (page == null)
+                {
+                    var tcs = new TaskCompletionSource<ITeamExplorerPage>();
+                    PropertyChangedEventHandler handler = null;
+
+                    handler = new PropertyChangedEventHandler((s, e) =>
+                    {
+                        if (e.PropertyName == "CurrentPage")
+                        {
+                            tcs.SetResult(te.CurrentPage);
+                            te.PropertyChanged -= handler;
+                        }
+                    });
+
+                    te.PropertyChanged += handler;
+
+                    page = await tcs.Task;
+                }
+
+                return page;
+            }
+            else
+            {
+                // TODO: Log
+                return null;
+            }
+        }
+
+        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories)
+        {
+            string basePath = null;
+            string repositoryName = null;
+
+            uiProvider.AddService(this, gitRepositories);
+
+            var load = uiProvider.SetupUI(UIControllerFlow.Clone, null);
+            load.Subscribe(x =>
+            {
+                if (x.Data.ViewType == Exports.UIViewType.Clone)
+                {
+                    var vm = x.View.ViewModel as IRepositoryCloneViewModel;
+                    x.View.Done.Subscribe(_ =>
+                    {
+                        basePath = vm.BaseRepositoryPath;
+                        repositoryName = vm.SelectedRepository.Name;
+                    });
+                }
+            });
+
+            uiProvider.RunUI();
+            uiProvider.RemoveService(typeof(IGitRepositoriesExt), this);
+
+            return new CloneRequest(basePath, repositoryName);
+        }
+
+        class CloneRequest
+        {
+            public CloneRequest(string basePath, string repositoryName)
+            {
+                BasePath = basePath;
+                RepositoryName = repositoryName;
+            }
+
+            public string BasePath { get; }
+            public string RepositoryName { get; }
         }
     }
 }
