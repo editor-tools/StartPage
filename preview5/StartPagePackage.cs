@@ -61,7 +61,8 @@ namespace GitHub.StartPage
             return new CodeContainer(
                 localProperties: new CodeContainerLocalProperties(path, CodeContainerType.Folder,
                                 new CodeContainerSourceControlProperties(request.RepositoryName, path, GitSccProvider)),
-                remote: null,
+                remote: new RemoteCodeContainer(request.RepositoryName, new Guid(ContainerGuid), 
+                                new Uri(request.CloneUrl), new Uri(request.CloneUrl.TrimSuffix(".git")), DateTimeOffset.UtcNow),
                 isFavorite: false,
                 lastAccessed: DateTimeOffset.UtcNow);
         }
@@ -117,6 +118,7 @@ namespace GitHub.StartPage
         {
             string basePath = null;
             string repositoryName = null;
+            string cloneUrl = null;
 
             uiProvider.AddService(this, gitRepositories);
 
@@ -130,6 +132,7 @@ namespace GitHub.StartPage
                     {
                         basePath = vm.BaseRepositoryPath;
                         repositoryName = vm.SelectedRepository.Name;
+                        cloneUrl = vm.SelectedRepository.CloneUrl;
                     });
                 }
             });
@@ -137,19 +140,21 @@ namespace GitHub.StartPage
             uiProvider.RunUI();
             uiProvider.RemoveService(typeof(IGitRepositoriesExt), this);
 
-            return new CloneRequest(basePath, repositoryName);
+            return new CloneRequest(basePath, repositoryName, cloneUrl);
         }
 
         class CloneRequest
         {
-            public CloneRequest(string basePath, string repositoryName)
+            public CloneRequest(string basePath, string repositoryName, string cloneUrl)
             {
                 BasePath = basePath;
                 RepositoryName = repositoryName;
+                CloneUrl = cloneUrl;
             }
 
             public string BasePath { get; }
             public string RepositoryName { get; }
+            public string CloneUrl { get; }
         }
     }
 }
