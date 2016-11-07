@@ -14,6 +14,9 @@ using ICodeContainerProvider = Microsoft.VisualStudio.Shell.CodeContainerManagem
 using CodeContainer = Microsoft.VisualStudio.Shell.CodeContainerManagement.CodeContainer;
 using Task = System.Threading.Tasks.Task;
 using System.ComponentModel;
+using GitHub.Models;
+using GitHub.Extensions;
+using GitHub.Primitives;
 
 namespace GitHub.StartPage
 {
@@ -41,13 +44,26 @@ namespace GitHub.StartPage
 
         public async Task<CodeContainer> AcquireCodeContainerAsync(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
+
+            return await RunAcquisition(downloadProgress, cancellationToken, null);
+        }
+
+        public async Task<CodeContainer> AcquireCodeContainerAsync(RemoteCodeContainer onlineCodeContainer, IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
+        {
+            var repository = new SimpleRepositoryModel(UriString.ToUriString(onlineCodeContainer.DisplayUrl));
+            return await RunAcquisition(downloadProgress, cancellationToken, repository);
+        }
+
+        async Task<CodeContainer> RunAcquisition(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken, ISimpleRepositoryModel repository)
+        {
             CloneRequest request = null;
 
             try
             {
                 var uiProvider = await Task.Run(() => Package.GetGlobalService(typeof(IUIProvider)) as IUIProvider);
+                var cm = uiProvider.TryGetService<IConnectionManager>();
                 var gitRepositories = await GetGitRepositoriesExt(uiProvider);
-                request = ShowCloneDialog(uiProvider, gitRepositories);
+                request = ShowCloneDialog(uiProvider, gitRepositories, repository);
             }
             catch
             {
@@ -57,19 +73,18 @@ namespace GitHub.StartPage
             if (request == null)
                 return null;
 
-            var path = Path.Combine(request.BasePath, request.RepositoryName);
+            var path = Path.Combine(request.BasePath, request.Repository.Name);
+            var uri = request.Repository.CloneUrl.ToRepositoryUrl();
             return new CodeContainer(
                 localProperties: new CodeContainerLocalProperties(path, CodeContainerType.Folder,
-                                new CodeContainerSourceControlProperties(request.RepositoryName, path, GitSccProvider)),
-                remote: new RemoteCodeContainer(request.RepositoryName, new Guid(ContainerGuid), 
-                                new Uri(request.CloneUrl), new Uri(request.CloneUrl.TrimSuffix(".git")), DateTimeOffset.UtcNow),
+                                new CodeContainerSourceControlProperties(request.Repository.Name, path, GitSccProvider)),
+                remote: new RemoteCodeContainer(request.Repository.Name,
+                                                GitSccProvider,
+                                                uri,
+                                                new Uri(uri.ToString().TrimSuffix(".git")),
+                                                DateTimeOffset.UtcNow),
                 isFavorite: false,
                 lastAccessed: DateTimeOffset.UtcNow);
-        }
-
-        public Task<CodeContainer> AcquireCodeContainerAsync(RemoteCodeContainer onlineCodeContainer, IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
-        {
-            throw new NotImplementedException();
         }
 
         async Task<IGitRepositoriesExt> GetGitRepositoriesExt(IUIProvider uiProvider)
@@ -114,25 +129,29 @@ namespace GitHub.StartPage
             }
         }
 
-        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories)
+        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories, ISimpleRepositoryModel repository = null)
         {
             string basePath = null;
-            string repositoryName = null;
-            string cloneUrl = null;
 
             uiProvider.AddService(this, gitRepositories);
 
-            var load = uiProvider.SetupUI(UIControllerFlow.Clone, null);
+            var load = uiProvider.SetupUI(repository == null ? UIControllerFlow.Clone : UIControllerFlow.StartPageClone,
+                null //TODO: set the connection corresponding to the repository if the repository is not null
+                );
             load.Subscribe(x =>
             {
-                if (x.Data.ViewType == Exports.UIViewType.Clone)
+                if ((repository == null && x.Data.ViewType == Exports.UIViewType.Clone) || // fire the normal clone dialog
+                    (repository != null && x.Data.ViewType == Exports.UIViewType.StartPageClone) // fire the clone dialog for re-acquiring a repo
+                   )
                 {
-                    var vm = x.View.ViewModel as IRepositoryCloneViewModel;
+                    var vm = x.View.ViewModel as IBaseCloneViewModel;
+                    if (repository != null)
+                        vm.SelectedRepository = repository;
                     x.View.Done.Subscribe(_ =>
                     {
                         basePath = vm.BaseRepositoryPath;
-                        repositoryName = vm.SelectedRepository.Name;
-                        cloneUrl = vm.SelectedRepository.CloneUrl;
+                        if (repository == null)
+                            repository = vm.SelectedRepository;
                     });
                 }
             });
@@ -140,21 +159,19 @@ namespace GitHub.StartPage
             uiProvider.RunUI();
             uiProvider.RemoveService(typeof(IGitRepositoriesExt), this);
 
-            return new CloneRequest(basePath, repositoryName, cloneUrl);
+            return new CloneRequest(basePath, repository);
         }
 
         class CloneRequest
         {
-            public CloneRequest(string basePath, string repositoryName, string cloneUrl)
+            public CloneRequest(string basePath, ISimpleRepositoryModel repository)
             {
                 BasePath = basePath;
-                RepositoryName = repositoryName;
-                CloneUrl = cloneUrl;
+                Repository = repository;
             }
 
             public string BasePath { get; }
-            public string RepositoryName { get; }
-            public string CloneUrl { get; }
+            public ISimpleRepositoryModel Repository { get; }
         }
     }
 }
