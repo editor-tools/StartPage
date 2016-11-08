@@ -17,12 +17,13 @@ using System.ComponentModel;
 using GitHub.Models;
 using GitHub.Extensions;
 using GitHub.Primitives;
+using GitHub.VisualStudio;
 
 namespace GitHub.StartPage
 {
     [PackageRegistration(UseManagedResourcesOnly = true)]
     [Guid(guidPackage)]
-    [ProvideCodeContainerProvider("GitHub Container", guidPackage, VisualStudio.Guids.ImagesId, 1, "#110", "#111", typeof(GitHubContainerProvider))]
+    [ProvideCodeContainerProvider("GitHub Container", guidPackage, Guids.ImagesId, 1, "#110", "#111", typeof(GitHubContainerProvider))]
     public sealed class StartPagePackage : ExtensionPointPackage
     {
         static IServiceProvider serviceProvider;
@@ -40,7 +41,7 @@ namespace GitHub.StartPage
     public class GitHubContainerProvider : ICodeContainerProvider
     {
         public const string ContainerGuid = "6CE146CB-EF57-4F2C-A93F-5BA685317660";
-        public static Guid GitSccProvider = new Guid("11B8E6D7-C08B-4385-B321-321078CDD1F8");
+        public static Guid GitSccProvider = new Guid(Guids.GitSccProviderId);
 
         public async Task<CodeContainer> AcquireCodeContainerAsync(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {

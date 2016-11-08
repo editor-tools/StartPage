@@ -10,6 +10,7 @@ using GitHub.ViewModels;
 using System.IO;
 using Microsoft.TeamFoundation.Controls;
 using Microsoft.TeamFoundation.Git.Controls.Extensibility;
+using GitHub.VisualStudio;
 
 namespace GitHub.StartPage
 {
@@ -69,7 +70,7 @@ namespace GitHub.StartPage
             if (path == null)
                 return null;
 
-            return new CodeContainer { LocalPath = path, Provider = new Guid("11B8E6D7-C08B-4385-B321-321078CDD1F8") };
+            return new CodeContainer { LocalPath = path, Provider = new Guid(Guids.GitSccProviderId) };
         }
 
         public Task<CodeContainer> AcquireCodeContainerAsync(CodeContainer onlineCodeContainer, IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
