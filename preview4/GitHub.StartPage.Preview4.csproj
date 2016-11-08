@@ -60,8 +60,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="StartPagePackage.cs" />
-    <Compile Include="..\AssemblyInfo.cs">
-      <Link>Properties\AssemblyInfo.cs</Link>
+    <Compile Include="..\..\..\..\src\common\SolutionInfo.cs" Condition="Exists('..\..\..\..\src\common\SolutionInfo.cs')">
+      <Link>Properties\SolutionInfo.cs</Link>
+    </Compile>
+    <Compile Include="..\VersionInfo.cs" Condition="!Exists('..\..\..\..\src\common\SolutionInfo.cs')">
+      <Link>Properties\VersionInfo.cs</Link>
     </Compile>
     <None Include="..\key.snk">
       <Link>key.snk</Link>
