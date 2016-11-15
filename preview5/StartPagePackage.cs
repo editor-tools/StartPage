@@ -37,12 +37,10 @@ namespace GitHub.StartPage
         }
     }
 
-    [Guid(ContainerGuid)]
+    [Guid(CodeContainerProviderId)]
     public class GitHubContainerProvider : ICodeContainerProvider
     {
-        public const string ContainerGuid = "6CE146CB-EF57-4F2C-A93F-5BA685317660";
-        public static Guid GitSccProvider = new Guid(Guids.GitSccProviderId);
-
+        public const string CodeContainerProviderId = "6CE146CB-EF57-4F2C-A93F-5BA685317660";
         public async Task<CodeContainer> AcquireCodeContainerAsync(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
 
@@ -78,9 +76,9 @@ namespace GitHub.StartPage
             var uri = request.Repository.CloneUrl.ToRepositoryUrl();
             return new CodeContainer(
                 localProperties: new CodeContainerLocalProperties(path, CodeContainerType.Folder,
-                                new CodeContainerSourceControlProperties(request.Repository.Name, path, GitSccProvider)),
+                                new CodeContainerSourceControlProperties(request.Repository.Name, path, new Guid(Guids.GitSccProviderId))),
                 remote: new RemoteCodeContainer(request.Repository.Name,
-                                                GitSccProvider,
+                                                new Guid(CodeContainerProviderId),
                                                 uri,
                                                 new Uri(uri.ToString().TrimSuffix(".git")),
                                                 DateTimeOffset.UtcNow),
