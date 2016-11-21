@@ -3,7 +3,7 @@
   <Import Project="..\..\..\..\packages\Microsoft.VSSDK.BuildTools.15.0.25901-RC\build\Microsoft.VSSDK.BuildTools.props" Condition="Exists('..\..\..\..\packages\Microsoft.VSSDK.BuildTools.15.0.25901-RC\build\Microsoft.VSSDK.BuildTools.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
-    <MinimumVisualStudioVersion>15.0</MinimumVisualStudioVersion>
+    <MinimumVisualStudioVersion>14.0</MinimumVisualStudioVersion>
     <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
     <NuGetPackageImportStamp>
     </NuGetPackageImportStamp>
@@ -64,6 +64,7 @@
     <Compile Include="..\VersionInfo.cs" Condition="!Exists('..\..\..\..\src\common\SolutionInfo.cs')">
       <Link>Properties\VersionInfo.cs</Link>
     </Compile>
+    <Compile Include="StartPageRepositoryModel.cs" />
     <None Include="..\key.snk">
       <Link>key.snk</Link>
     </None>
