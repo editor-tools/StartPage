@@ -37,12 +37,10 @@ namespace GitHub.StartPage
         }
     }
 
-    [Guid(ContainerGuid)]
+    [Guid(CodeContainerProviderId)]
     public class GitHubContainerProvider : ICodeContainerProvider
     {
-        public const string ContainerGuid = "6CE146CB-EF57-4F2C-A93F-5BA685317660";
-        public static Guid GitSccProvider = new Guid(Guids.GitSccProviderId);
-
+        public const string CodeContainerProviderId = "6CE146CB-EF57-4F2C-A93F-5BA685317660";
         public async Task<CodeContainer> AcquireCodeContainerAsync(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
 
@@ -51,11 +49,11 @@ namespace GitHub.StartPage
 
         public async Task<CodeContainer> AcquireCodeContainerAsync(RemoteCodeContainer onlineCodeContainer, IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken)
         {
-            var repository = new SimpleRepositoryModel(UriString.ToUriString(onlineCodeContainer.DisplayUrl));
+            var repository = new StartPageRepositoryModel(onlineCodeContainer.Name, UriString.ToUriString(onlineCodeContainer.DisplayUrl));
             return await RunAcquisition(downloadProgress, cancellationToken, repository);
         }
 
-        async Task<CodeContainer> RunAcquisition(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken, ISimpleRepositoryModel repository)
+        async Task<CodeContainer> RunAcquisition(IProgress<ServiceProgressData> downloadProgress, CancellationToken cancellationToken, IRemoteRepositoryModel repository)
         {
             CloneRequest request = null;
 
@@ -78,9 +76,9 @@ namespace GitHub.StartPage
             var uri = request.Repository.CloneUrl.ToRepositoryUrl();
             return new CodeContainer(
                 localProperties: new CodeContainerLocalProperties(path, CodeContainerType.Folder,
-                                new CodeContainerSourceControlProperties(request.Repository.Name, path, GitSccProvider)),
+                                new CodeContainerSourceControlProperties(request.Repository.Name, path, new Guid(Guids.GitSccProviderId))),
                 remote: new RemoteCodeContainer(request.Repository.Name,
-                                                GitSccProvider,
+                                                new Guid(CodeContainerProviderId),
                                                 uri,
                                                 new Uri(uri.ToString().TrimSuffix(".git")),
                                                 DateTimeOffset.UtcNow),
@@ -130,7 +128,7 @@ namespace GitHub.StartPage
             }
         }
 
-        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories, ISimpleRepositoryModel repository = null)
+        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories, IRemoteRepositoryModel repository = null)
         {
             string basePath = null;
 
@@ -165,14 +163,14 @@ namespace GitHub.StartPage
 
         class CloneRequest
         {
-            public CloneRequest(string basePath, ISimpleRepositoryModel repository)
+            public CloneRequest(string basePath, IRemoteRepositoryModel repository)
             {
                 BasePath = basePath;
                 Repository = repository;
             }
 
             public string BasePath { get; }
-            public ISimpleRepositoryModel Repository { get; }
+            public IRemoteRepositoryModel Repository { get; }
         }
     }
 }
