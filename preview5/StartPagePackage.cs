@@ -59,7 +59,7 @@ namespace GitHub.StartPage
 
             try
             {
-                var uiProvider = await Task.Run(() => Package.GetGlobalService(typeof(IUIProvider)) as IUIProvider);
+                var uiProvider = await Task.Run(() => Package.GetGlobalService(typeof(IGitHubServiceProvider)) as IGitHubServiceProvider);
                 var cm = uiProvider.TryGetService<IConnectionManager>();
                 var gitRepositories = await GetGitRepositoriesExt(uiProvider);
                 request = ShowCloneDialog(uiProvider, gitRepositories, repository);
@@ -86,15 +86,15 @@ namespace GitHub.StartPage
                 lastAccessed: DateTimeOffset.UtcNow);
         }
 
-        async Task<IGitRepositoriesExt> GetGitRepositoriesExt(IUIProvider uiProvider)
+        async Task<IGitRepositoriesExt> GetGitRepositoriesExt(IGitHubServiceProvider gitHubServiceProvider)
         {
-            var page = await GetTeamExplorerPage(uiProvider);
+            var page = await GetTeamExplorerPage(gitHubServiceProvider);
             return page?.GetService<IGitRepositoriesExt>();
         }
 
-        async Task<ITeamExplorerPage> GetTeamExplorerPage(IUIProvider uiProvider)
+        async Task<ITeamExplorerPage> GetTeamExplorerPage(IGitHubServiceProvider gitHubServiceProvider)
         {
-            var te = uiProvider?.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
+            var te = gitHubServiceProvider?.GetService(typeof(ITeamExplorer)) as ITeamExplorer;
 
             if (te != null)
             {
@@ -128,16 +128,16 @@ namespace GitHub.StartPage
             }
         }
 
-        CloneRequest ShowCloneDialog(IUIProvider uiProvider, IGitRepositoriesExt gitRepositories, IRemoteRepositoryModel repository = null)
+        CloneRequest ShowCloneDialog(IGitHubServiceProvider gitHubServiceProvider, IGitRepositoriesExt gitRepositories, IRemoteRepositoryModel repository = null)
         {
             string basePath = null;
 
-            uiProvider.AddService(this, gitRepositories);
-
-            var load = uiProvider.SetupUI(repository == null ? UIControllerFlow.Clone : UIControllerFlow.StartPageClone,
+            gitHubServiceProvider.AddService(this, gitRepositories);
+            var uiProvider = gitHubServiceProvider.GetService<IUIProvider>();
+            var controller = uiProvider.Configure(repository == null ? UIControllerFlow.Clone : UIControllerFlow.StartPageClone,
                 null //TODO: set the connection corresponding to the repository if the repository is not null
                 );
-            load.Subscribe(x =>
+            controller.TransitionSignal.Subscribe(x =>
             {
                 if ((repository == null && x.Data.ViewType == Exports.UIViewType.Clone) || // fire the normal clone dialog
                     (repository != null && x.Data.ViewType == Exports.UIViewType.StartPageClone) // fire the clone dialog for re-acquiring a repo
@@ -155,8 +155,8 @@ namespace GitHub.StartPage
                 }
             });
 
-            uiProvider.RunUI();
-            uiProvider.RemoveService(typeof(IGitRepositoriesExt), this);
+            controller.Start();
+            gitHubServiceProvider.RemoveService(typeof(IGitRepositoriesExt), this);
 
             return new CloneRequest(basePath, repository);
         }
